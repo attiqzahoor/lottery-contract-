@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Lottery {
+    address public owner;
+    address[] public participants;
+    uint256 public ticketPrice; // Ticket price set to 10 ETH
+    uint256 public totalFunds;
+    bool public lotteryActive;
+
+    event TicketPurchased(address participant);
+    event WinnerSelected(address winner, uint256 amount);
+    event CharityDonation(address charity, uint256 amount);
+
+    constructor() {
+        owner = msg.sender;
+        ticketPrice = 10 ether; // Set ticket price to 10 ETH
+        lotteryActive = false;
+    }
+
+    // Modifier to restrict access to the owner
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _;
+    }
+
+    // Start a new lottery
+    function startLottery() public onlyOwner {
+        require(!lotteryActive, "Lottery is already active");
+        lotteryActive = true;
+        delete participants; // Correct way to reset participants array
+        totalFunds = 0; // Reset total funds
+    }
+
+    // Purchase a lottery ticket
+    function buyTicket() public payable {
+        require(lotteryActive, "Lottery is not active");
+        require(msg.value == ticketPrice, "Incorrect ticket price");
+
+        participants.push(msg.sender);
+        totalFunds += msg.value;
+
+        emit TicketPurchased(msg.sender);
+    }
+
+    // Select a random winner
+    function selectWinner() public onlyOwner {
+        require(lotteryActive, "Lottery is not active");
+        require(participants.length > 0, "No participants in the lottery");
+
+        // Pseudo-random selection (Note: For production use, consider a more secure randomization method)
+        uint256 winnerIndex = uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty))) % participants.length;
+        address winner = participants[winnerIndex];
+
+        // Calculate charity donation (10%)
+        uint256 charityAmount = (totalFunds * 10) / 100;
+        uint256 winnerAmount = totalFunds - charityAmount;
+
+        // Transfer the winner's prize and charity donation
+        payable(winner).transfer(winnerAmount);
+        payable(owner).transfer(charityAmount); // Assuming the charity is the owner for this example
+
+        emit WinnerSelected(winner, winnerAmount);
+        emit CharityDonation(owner, charityAmount); // Adjust as needed for the charity address
+
+        // Reset lottery
+        lotteryActive = false;
+        delete participants; // Correct way to reset participants array
+        totalFunds = 0;
+    }
+}
